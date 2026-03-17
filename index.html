@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artists & Designers 図鑑</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F4F1EC;
+  --surface:#FDFCF9;
+  --border:rgba(0,0,0,0.09);
+  --border-h:rgba(0,0,0,0.2);
+  --t1:#1a1916;
+  --t2:#6b6760;
+  --t3:#a8a49e;
+  --accent:#1a1916;
+  --tag:#EAE7E0;
+  --overlay:rgba(20,18,14,0.6);
+  --radius:12px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;overflow-x:hidden}
+
+/* ── HEADER ── */
+header{
+  padding:2rem 2rem 0;
+  max-width:1320px;margin:0 auto;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap;
+}
+.logo{font-family:'DM Serif Display',serif;font-size:clamp(24px,3.5vw,38px);letter-spacing:-0.02em;line-height:1}
+.logo em{font-style:italic;color:var(--t2)}
+.header-right{display:flex;align-items:center;gap:10px}
+.view-toggle{display:flex;border:1px solid var(--border-h);border-radius:8px;overflow:hidden;background:var(--surface)}
+.view-btn{padding:7px 14px;font-family:'DM Sans',sans-serif;font-size:12px;border:none;background:transparent;cursor:pointer;color:var(--t2);transition:all .15s;display:flex;align-items:center;gap:5px;letter-spacing:.03em}
+.view-btn.active{background:var(--accent);color:#fff}
+.view-btn svg{flex-shrink:0}
+
+/* ── CONTROLS ── */
+.controls{max-width:1320px;margin:0 auto;padding:1.25rem 2rem 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.search-wrap{position:relative;flex:0 0 280px}
+.search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.3;pointer-events:none}
+input[type=text]{width:100%;padding:9px 12px 9px 35px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--t1);outline:none;transition:border-color .15s}
+input[type=text]:focus{border-color:var(--border-h)}
+input[type=text]::placeholder{color:var(--t3)}
+.filter-row{display:flex;gap:5px;flex-wrap:wrap}
+.filter-btn{padding:6px 13px;border:1px solid var(--border);border-radius:20px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;background:transparent;color:var(--t2);transition:all .15s;letter-spacing:.02em}
+.filter-btn:hover{border-color:var(--border-h);color:var(--t1)}
+.filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.count{font-size:12px;color:var(--t3);letter-spacing:.05em;margin-left:auto}
+
+/* ── GRID VIEW ── */
+#grid-view{max-width:1320px;margin:0 auto;padding:1.5rem 2rem 4rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--border-h);transform:translateY(-2px)}
+.card-img-wrap{width:100%;aspect-ratio:1;background:var(--tag);position:relative;overflow:hidden}
+.card-img-wrap img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .3s}
+.card-img-wrap .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:42px;font-style:italic;color:var(--t3)}
+.card-body{padding:12px 13px 14px}
+.card-cat{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+.card-name{font-size:14px;font-weight:500;line-height:1.3;margin-bottom:2px}
+.card-en{font-size:11px;color:var(--t2);font-style:italic}
+
+/* ── MAP VIEW ── */
+#map-view{display:none;flex-direction:column}
+#map-view.active{display:flex}
+#map-container{height:calc(100vh - 180px);min-height:400px;width:100%}
+#map-container .leaflet-container{background:#e8e4dc}
+.leaflet-popup-content-wrapper{border-radius:10px;border:1px solid var(--border);box-shadow:0 4px 20px rgba(0,0,0,.12);font-family:'DM Sans',sans-serif}
+.leaflet-popup-content{margin:0;padding:0}
+.map-popup{padding:14px 16px;min-width:180px}
+.map-popup-cat{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:4px}
+.map-popup-name{font-size:15px;font-weight:500;margin-bottom:2px}
+.map-popup-en{font-size:12px;color:var(--t2);font-style:italic;margin-bottom:10px}
+.map-popup-btn{display:block;width:100%;padding:7px;border:1px solid var(--border-h);border-radius:7px;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;text-align:center}
+.map-popup-btn:hover{opacity:.85}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:var(--overlay);z-index:1000;align-items:flex-end;justify-content:center;padding:0;backdrop-filter:blur(2px)}
+@media(min-width:640px){.modal-overlay{align-items:center;padding:2rem}}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-width:660px;max-height:92vh;overflow-y:auto;position:relative;animation:slideUp .25s ease}
+@media(min-width:640px){.modal{border-radius:16px}}
+@keyframes slideUp{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-close{position:absolute;top:1rem;right:1rem;width:32px;height:32px;border-radius:50%;border:1px solid var(--border-h);background:rgba(253,252,249,.92);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--t2);z-index:10;backdrop-filter:blur(4px)}
+
+/* hero */
+.modal-hero{width:100%;aspect-ratio:16/6;object-fit:cover;display:block;background:var(--tag);border-radius:16px 16px 0 0}
+.modal-hero-placeholder{width:100%;aspect-ratio:16/6;display:flex;align-items:center;justify-content:center;background:var(--tag);border-radius:16px 16px 0 0}
+.modal-hero-placeholder span{font-family:'DM Serif Display',serif;font-size:64px;font-style:italic;color:var(--t3)}
+
+.modal-body{padding:1.5rem}
+.modal-cat{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-bottom:5px}
+.modal-name{font-family:'DM Serif Display',serif;font-size:clamp(24px,5vw,32px);line-height:1.1;margin-bottom:3px}
+.modal-en{font-size:14px;color:var(--t2);font-style:italic;margin-bottom:.6rem}
+.modal-birth{font-size:13px;color:var(--t3);padding-bottom:1.25rem;border-bottom:1px solid var(--border)}
+
+.sec-title{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--t3);margin:1.25rem 0 .5rem}
+.modal-text{font-size:14px;line-height:1.8;color:var(--t1)}
+
+/* works */
+.works-list{display:flex;flex-direction:column;gap:8px}
+.work-card{border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;gap:0;background:var(--bg);text-decoration:none;color:inherit;transition:border-color .15s,transform .15s;cursor:pointer}
+.work-card:hover{border-color:var(--border-h);transform:translateY(-1px)}
+.work-thumb-wrap{flex:0 0 90px;aspect-ratio:1;background:var(--tag);position:relative;overflow:hidden}
+.work-thumb-wrap img{width:100%;height:100%;object-fit:cover}
+.work-thumb-wrap .wi{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:26px;font-style:italic;color:var(--t3)}
+.work-info{padding:10px 12px;flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.work-title{font-size:13px;font-weight:500;margin-bottom:3px}
+.work-year{font-size:11px;color:var(--t3);margin-bottom:4px}
+.work-desc{font-size:12px;color:var(--t2);line-height:1.5}
+.work-link-hint{font-size:10px;color:var(--t3);margin-top:5px;display:flex;align-items:center;gap:3px}
+/* text highlights */
+.modal-text strong{font-weight:500;color:var(--t1);background:rgba(0,0,0,0.05);padding:0 3px;border-radius:3px}
+.modal-text u{text-decoration:underline;text-decoration-color:rgba(0,0,0,0.3);text-underline-offset:2px;text-decoration-thickness:1.5px}
+
+/* tags & links */
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:1rem}
+.tag{font-size:11px;padding:4px 10px;background:var(--tag);border-radius:20px;color:var(--t2)}
+.links-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border)}
+.link-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border:1px solid var(--border-h);border-radius:8px;font-size:12px;color:var(--t1);text-decoration:none;background:var(--surface);transition:background .15s}
+.link-btn:hover{background:var(--tag)}
+.link-btn svg{opacity:.5}
+
+/* loading */
+.loading-row{display:flex;align-items:center;gap:8px;padding:.75rem 0;color:var(--t3);font-size:13px}
+.dots{display:flex;gap:4px}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--t3);animation:pu .7s infinite alternate}
+.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+@keyframes pu{to{opacity:.2;transform:scale(.6)}}
+
+.no-results{grid-column:1/-1;text-align:center;padding:5rem 0;color:var(--t3);font-size:14px}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-h);border-radius:3px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Artists &amp; Designers <em>図鑑</em></div>
+  <div class="header-right">
+    <span class="count" id="count-badge" style="margin-left:0"></span>
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-grid" onclick="switchView('grid')">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><rect x="0" y="0" width="5.5" height="5.5" rx="1"/><rect x="7.5" y="0" width="5.5" height="5.5" rx="1"/><rect x="0" y="7.5" width="5.5" height="5.5" rx="1"/><rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1"/></svg>
+        グリッド
+      </button>
+      <button class="view-btn" id="btn-map" onclick="switchView('map')">
+        <svg width="12" height="13" viewBox="0 0 12 13" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M6 1C3.79 1 2 2.84 2 5.11c0 3.17 4 7.39 4 7.39s4-4.22 4-7.39C10 2.84 8.21 1 6 1z"/><circle cx="6" cy="5.1" r="1.4" fill="currentColor" stroke="none"/></svg>
+        地図
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="search-wrap">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.3"/><line x1="8.2" y1="8.2" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <input type="text" id="search" placeholder="名前で検索..." oninput="filterCards()">
+  </div>
+  <div class="filter-row" id="filter-row"></div>
+</div>
+
+<!-- GRID -->
+<div id="grid-view"></div>
+
+<!-- MAP -->
+<div id="map-view">
+  <div id="map-container"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div id="modal-hero-area"></div>
+    <div class="modal-body">
+      <div class="modal-cat" id="m-cat"></div>
+      <div class="modal-name" id="m-name"></div>
+      <div class="modal-en" id="m-en"></div>
+      <div class="modal-birth" id="m-birth"></div>
+      <div id="m-content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PEOPLE = [
+  { name:"レベッカ・ホルン",       cat:"アーティスト",          en:"Rebecca Horn",          wiki:"Rebecca_Horn",          lat:49.7,  lng:8.1,   country:"ドイツ" },
+  { name:"ピッパ・ガーナー",       cat:"アーティスト",          en:"Pippa Garner",          wiki:"Pippa_Garner",          lat:34.05, lng:-118.2,country:"アメリカ" },
+  { name:"ヘルマン・デ・フリース", cat:"アーティスト",          en:"Herman de Vries",       wiki:"Herman_de_Vries",       lat:52.37, lng:4.9,   country:"オランダ" },
+  { name:"ロニ・ホーン",           cat:"アーティスト",          en:"Roni Horn",             wiki:"Roni_Horn",             lat:40.71, lng:-74.0, country:"アメリカ" },
+  { name:"ポントゥス・フルテン",   cat:"キュレーター",          en:"Pontus Hultén",         wiki:"Pontus_Hulten",         lat:59.33, lng:18.06, country:"スウェーデン" },
+  { name:"ルイーズ・ブルジョワ",   cat:"アーティスト",          en:"Louise Bourgeois",      wiki:"Louise_Bourgeois",      lat:48.85, lng:2.35,  country:"フランス" },
+  { name:"マウリツィオ・ナンヌッチ",cat:"アーティスト",         en:"Maurizio Nannucci",     wiki:"Maurizio_Nannucci",     lat:43.77, lng:11.25, country:"イタリア" },
+  { name:"ジョナサン・モンク",     cat:"アーティスト",          en:"Jonathan Monk",         wiki:"Jonathan_Monk_(artist)",lat:52.48, lng:-1.9,  country:"イギリス" },
+  { name:"エレン・アルトフェスト", cat:"アーティスト",          en:"Ellen Altfest",         wiki:"Ellen_Altfest",         lat:40.71, lng:-74.0, country:"アメリカ" },
+  { name:"ホセ・ダビラ",           cat:"アーティスト",          en:"José Dávila",           wiki:"José_Dávila",           lat:20.67, lng:-103.35,country:"メキシコ" },
+  { name:"フィッシュリ＆ワイス",   cat:"アーティスト",          en:"Fischli and Weiss",     wiki:"Fischli_and_Weiss",     lat:47.37, lng:8.54,  country:"スイス" },
+  { name:"レイ・ジョンソン",       cat:"アーティスト",          en:"Ray Johnson",           wiki:"Ray_Johnson",           lat:42.33, lng:-83.04,country:"アメリカ" },
+  { name:"ジョアン・ミロ",         cat:"アーティスト",          en:"Joan Miró",             wiki:"Joan_Miró",             lat:41.38, lng:2.17,  country:"スペイン" },
+  { name:"ソフィ・トイバー＝アルプ",cat:"アーティスト",         en:"Sophie Taeuber-Arp",    wiki:"Sophie_Taeuber-Arp",    lat:47.55, lng:7.59,  country:"スイス" },
+  { name:"ヒルマ・アフ・クリント", cat:"アーティスト",          en:"Hilma af Klint",        wiki:"Hilma_af_Klint",        lat:59.33, lng:18.06, country:"スウェーデン" },
+  { name:"ジュリアン・オピー",     cat:"アーティスト",          en:"Julian Opie",           wiki:"Julian_Opie",           lat:51.5,  lng:-0.12, country:"イギリス" },
+  { name:"ローレンス・ワイナー",   cat:"アーティスト",          en:"Lawrence Weiner",       wiki:"Lawrence_Weiner",       lat:40.71, lng:-74.0, country:"アメリカ" },
+  { name:"タシタ・ディーン",       cat:"アーティスト",          en:"Tacita Dean",           wiki:"Tacita_Dean",           lat:51.5,  lng:-0.12, country:"イギリス" },
+  { name:"トレイシー・エミン",     cat:"アーティスト",          en:"Tracey Emin",           wiki:"Tracey_Emin",           lat:51.35, lng:1.42,  country:"イギリス" },
+  { name:"ダミアン・ハースト",     cat:"アーティスト",          en:"Damien Hirst",          wiki:"Damien_Hirst",          lat:53.8,  lng:-1.55, country:"イギリス" },
+  { name:"カレル・マルテンス",     cat:"グラフィックデザイナー",en:"Karel Martens",         wiki:"Karel_Martens",         lat:52.37, lng:4.9,   country:"オランダ" },
+  { name:"ブルーノ・ムナーリ",     cat:"デザイナー",            en:"Bruno Munari",          wiki:"Bruno_Munari",          lat:45.46, lng:9.19,  country:"イタリア" },
+  { name:"Universal Everything",  cat:"スタジオ",              en:"Universal Everything",  wiki:"Universal_Everything",  lat:53.38, lng:-1.47, country:"イギリス" },
+  { name:"ハーブ・ルバリン",       cat:"グラフィックデザイナー",en:"Herb Lubalin",          wiki:"Herb_Lubalin",          lat:40.71, lng:-74.0, country:"アメリカ" },
+  { name:"ブラッドベリー・トンプソン",cat:"グラフィックデザイナー",en:"Bradbury Thompson",   wiki:"Bradbury_Thompson",     lat:37.69, lng:-97.34,country:"アメリカ" },
+  { name:"ポール・ランド",         cat:"グラフィックデザイナー",en:"Paul Rand",             wiki:"Paul_Rand",             lat:40.71, lng:-74.0, country:"アメリカ" },
+  { name:"駒形克己",               cat:"グラフィックデザイナー",en:"Katsumi Komagata",      wiki:"Katsumi_Komagata",      lat:35.68, lng:139.69,country:"日本" },
+  { name:"中條正義",               cat:"グラフィックデザイナー",en:"Masayoshi Nakajo",      wiki:"Masayoshi_Nakajo",      lat:35.68, lng:139.69,country:"日本" },
+  { name:"リチャード・ポール・ローゼ",cat:"グラフィックデザイナー",en:"Richard Paul Lohse",  wiki:"Richard_Paul_Lohse",    lat:47.37, lng:8.54,  country:"スイス" },
+  { name:"エミール・ルーダー",     cat:"タイポグラファー",      en:"Emil Ruder",            wiki:"Emil_Ruder",            lat:47.55, lng:7.59,  country:"スイス" },
+  { name:"アンリ・マティス",       cat:"アーティスト",          en:"Henri Matisse",         wiki:"Henri_Matisse",         lat:47.0,  lng:2.35,  country:"フランス" },
+  { name:"ヘルムート・シュミット", cat:"タイポグラファー",      en:"Helmut Schmid",         wiki:"Helmut_Schmid",         lat:48.14, lng:11.58, country:"ドイツ" },
+  { name:"瀧口修造",               cat:"美術評論家",            en:"Shuzo Takiguchi",       wiki:"Shuzo_Takiguchi",       lat:36.7,  lng:137.2, country:"日本" },
+  { name:"マックス・ビル",         cat:"デザイナー",            en:"Max Bill",              wiki:"Max_Bill",              lat:47.48, lng:8.75,  country:"スイス" },
+  { name:"アキッレ・カスティリオーニ",cat:"デザイナー",         en:"Achille Castiglioni",   wiki:"Achille_Castiglioni",   lat:45.46, lng:9.19,  country:"イタリア" },
+  { name:"オトル・アイヒャー",     cat:"グラフィックデザイナー",en:"Otl Aicher",            wiki:"Otl_Aicher",            lat:47.72, lng:10.32, country:"ドイツ" },
+  { name:"エンツォ・マーリ",       cat:"デザイナー",            en:"Enzo Mari",             wiki:"Enzo_Mari",             lat:45.06, lng:7.69,  country:"イタリア" },
+  { name:"ディーター・ラムス",     cat:"プロダクトデザイナー",  en:"Dieter Rams",           wiki:"Dieter_Rams",           lat:50.0,  lng:8.24,  country:"ドイツ" },
+  { name:"ホセ・キンタナー",       cat:"アーティスト",          en:"José Quintanar",        wiki:"José_Quintanar",        lat:40.41, lng:-3.7,  country:"スペイン" },
+  { name:"ノーマン・アイブス",     cat:"グラフィックデザイナー",en:"Norman Ives",           wiki:"Norman_Ives",           lat:40.71, lng:-74.0, country:"アメリカ" },
+  { name:"ナキム",                 cat:"グラフィックデザイナー",en:"Naquim",                wiki:"",                      lat:35.68, lng:139.69,country:"日本" },
+  { name:"レイナー・ブレナー",     cat:"アーティスト",          en:"Rainer Bremer",         wiki:"",                      lat:51.16, lng:10.45, country:"ドイツ" },
+  { name:"ソドホ",                 cat:"アーティスト",          en:"Sodeho",                wiki:"",                      lat:35.68, lng:139.69,country:"日本" },
+];
+
+const CATS = ["すべて",...new Set(PEOPLE.map(p=>p.cat))];
+let activeFilter = "すべて";
+let infoCache = {};
+let imgCache = {};
+let currentView = "grid";
+let leafletMap = null;
+let markers = [];
+
+function ini(name){
+  return name.replace(/[・＝]/g,' ').split(/\s+/).filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()||name[0];
+}
+
+// ── Wikipedia image fetch ──
+async function fetchWikiImage(wikiSlug){
+  if(!wikiSlug) return null;
+  if(imgCache[wikiSlug] !== undefined) return imgCache[wikiSlug];
+  try{
+    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiSlug)}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const img = d.thumbnail ? d.thumbnail.source.replace(/\/\d+px-/,'/400px-') : null;
+    imgCache[wikiSlug] = img;
+    return img;
+  }catch(e){ imgCache[wikiSlug]=null; return null; }
+}
+
+// ── Claude API info fetch ──
+async function fetchInfo(idx){
+  if(infoCache[idx]) return infoCache[idx];
+  const p = PEOPLE[idx];
+  const res = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens:1200,
+      system:"アーティスト・デザイナーの専門家。必ずJSONのみで回答。バッククォートや前置き文は絶対不要。日本語で。",
+      messages:[{role:"user",content:`${p.en}（${p.name}）について:
+{
+  "birth": "生年と出身地（例: 1944年、ドイツ・バート・ベルクツァーベルン生まれ）",
+  "summary": "概要を2〜3文。重要な固有名詞・概念・作品名は<strong>タグで、特筆すべき特徴は<u>タグで囲む。HTMLタグのみ使用可。",
+  "achievements": "功績・注目点を2〜3文。重要語は<strong>タグで、特徴的な手法や影響は<u>タグで囲む。",
+  "works": [{"title":"作品名","year":"制作年","desc":"説明1〜2文","searchQuery":"Wikipedia検索用英語クエリ（例: The Physical Impossibility of Death Damien Hirst）","googleUrl":"https://www.google.com/search?q=作品名+作者名+artwork&tbm=isch"}],
+  "keywords": ["kw1","kw2","kw3","kw4"],
+  "wikipedia_en": "英語Wikipedia記事タイトル（スペースはアンダースコア）",
+  "pixelArtHints": {"hairColor":"#xxxxxx","skinColor":"#xxxxxx","clothColor":"#xxxxxx","eyeColor":"#xxxxxx","feature":"特徴（例:眼鏡、ひげ、帽子など、なければ空文字）"}
+}
+works は代表作2〜3点。googleUrl は実際にブラウザで開けるGoogle画像検索URL。`}]
+    })
+  });
+  const d = await res.json();
+  const raw = d.content.map(b=>b.text||"").join("");
+  const info = JSON.parse(raw.replace(/```json|```/g,"").trim());
+  infoCache[idx] = info;
+  return info;
+}
+
+// ── Filters ──
+function renderFilters(){
+  document.getElementById("filter-row").innerHTML = CATS.map(c=>
+    `<button class="filter-btn ${c===activeFilter?'active':''}" onclick="setFilter('${c}')">${c}</button>`
+  ).join("");
+}
+function setFilter(cat){ activeFilter=cat; renderFilters(); filterCards(); if(currentView==="map") updateMapMarkers(); }
+
+function getFiltered(){
+  const q = document.getElementById("search").value.toLowerCase();
+  return PEOPLE.filter(p=>{
+    const mc = activeFilter==="すべて"||p.cat===activeFilter;
+    const mq = !q||p.name.includes(q)||p.en.toLowerCase().includes(q)||p.country.includes(q);
+    return mc&&mq;
+  });
+}
+
+// ── GRID ──
+function filterCards(){
+  const filtered = getFiltered();
+  document.getElementById("count-badge").textContent = `${filtered.length} 人`;
+  if(filtered.length===0){
+    document.getElementById("grid-view").innerHTML=`<div class="no-results">該当なし</div>`;
+    return;
+  }
+  document.getElementById("grid-view").innerHTML = filtered.map(p=>{
+    const idx = PEOPLE.indexOf(p);
+    return `<div class="card" onclick="openModal(${idx})" data-idx="${idx}">
+      <div class="card-img-wrap" id="thumb-${idx}">
+        <div class="ini">${ini(p.name)}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-cat">${p.cat}</div>
+        <div class="card-name">${p.name}</div>
+        <div class="card-en">${p.en}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // generate pixel art for each card
+  filtered.forEach(p=>{
+    const idx = PEOPLE.indexOf(p);
+    generatePixelArt(idx);
+  });
+}
+
+// ── MAP ──
+function switchView(v){
+  currentView = v;
+  document.getElementById("btn-grid").classList.toggle("active", v==="grid");
+  document.getElementById("btn-map").classList.toggle("active", v==="map");
+  document.getElementById("grid-view").style.display = v==="grid"?"grid":"none";
+  const mapEl = document.getElementById("map-view");
+  mapEl.style.display = v==="map"?"flex":"none";
+  if(v==="map") initMap();
+}
+
+function initMap(){
+  if(leafletMap){ updateMapMarkers(); return; }
+  leafletMap = L.map("map-container",{zoomControl:true}).setView([30,10],2);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{
+    attribution:'&copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom:18
+  }).addTo(leafletMap);
+  updateMapMarkers();
+}
+
+function updateMapMarkers(){
+  markers.forEach(m=>m.remove());
+  markers=[];
+  const filtered = getFiltered();
+  // group by near coordinates
+  const placed = {};
+  filtered.forEach(p=>{
+    const idx = PEOPLE.indexOf(p);
+    const key = `${p.lat.toFixed(1)}_${p.lng.toFixed(1)}`;
+    if(!placed[key]) placed[key]=[];
+    placed[key].push({p,idx});
+  });
+
+  Object.values(placed).forEach(group=>{
+    group.forEach(({p,idx},i)=>{
+      const jitterLat = p.lat + (i * 0.8);
+      const jitterLng = p.lng + (i * 0.8);
+      const icon = L.divIcon({
+        className:"",
+        html:`<div style="
+          width:38px;height:38px;border-radius:50%;
+          border:2.5px solid white;
+          box-shadow:0 2px 8px rgba(0,0,0,0.25);
+          background:#e8e4dc;
+          overflow:hidden;
+          display:flex;align-items:center;justify-content:center;
+          font-family:'DM Serif Display',serif;font-size:14px;font-style:italic;
+          color:#a8a49e;
+          cursor:pointer;
+          transition:transform .15s;
+        " data-wiki="${p.wiki}" id="micon-${idx}">
+          ${ini(p.name)}
+        </div>`,
+        iconSize:[38,38],
+        iconAnchor:[19,19]
+      });
+
+      const marker = L.marker([jitterLat,jitterLng],{icon}).addTo(leafletMap);
+      marker.bindPopup(`
+        <div class="map-popup">
+          <div class="map-popup-cat">${p.cat} · ${p.country}</div>
+          <div class="map-popup-name">${p.name}</div>
+          <div class="map-popup-en">${p.en}</div>
+          <button class="map-popup-btn" onclick="openModal(${idx})">詳細を見る →</button>
+        </div>
+      `,{maxWidth:220});
+
+      markers.push(marker);
+
+      // load photo into marker icon
+      if(p.wiki){
+        fetchWikiImage(p.wiki).then(url=>{
+          if(!url) return;
+          const el = document.getElementById(`micon-${idx}`);
+          if(el) el.innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+        });
+      }
+    });
+  });
+}
+
+// ── MODAL ──
+async function openModal(idx){
+  const p = PEOPLE[idx];
+  document.getElementById("m-cat").textContent = p.cat;
+  document.getElementById("m-name").textContent = p.name;
+  document.getElementById("m-en").textContent = p.en;
+  document.getElementById("m-birth").textContent = "";
+  document.getElementById("m-content").innerHTML = `<div class="loading-row"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><span>情報を取得中...</span></div>`;
+
+  // hero - pixel art
+  const heroArea = document.getElementById("modal-hero-area");
+  heroArea.innerHTML = `<div class="modal-hero-placeholder" id="hero-pixel-${idx}"><span>${ini(p.name)}</span></div>`;
+  generatePixelArtHero(idx);
+
+  document.getElementById("modal-overlay").classList.add("open");
+  document.getElementById("modal").scrollTop = 0;
+
+  try{
+    const info = await fetchInfo(idx);
+    document.getElementById("m-birth").textContent = info.birth||p.country;
+    // update pixel art with richer hints from info
+    if(info.pixelArtHints){
+      pixelCache[idx] = info.pixelArtHints;
+      applyPixelToThumb(idx, info.pixelArtHints);
+      generatePixelArtHero(idx);
+    }
+
+    // build content
+    let html = `
+      <div class="sec-title">概要</div>
+      <p class="modal-text">${info.summary}</p>
+      <div class="sec-title">功績・注目点</div>
+      <p class="modal-text">${info.achievements}</p>`;
+
+    if(info.works && info.works.length){
+      html += `<div class="sec-title">代表作</div><div class="works-list">`;
+      for(const w of info.works){
+        const wid = `w-${idx}-${Math.random().toString(36).slice(2,6)}`;
+        const href = w.googleUrl || `https://www.google.com/search?q=${encodeURIComponent(w.title+' '+p.en)}&tbm=isch`;
+        html += `<a class="work-card" href="${href}" target="_blank" rel="noopener">
+          <div class="work-thumb-wrap" id="${wid}">
+            <div class="wi">${ini(p.name)}</div>
+          </div>
+          <div class="work-info">
+            <div class="work-title">${w.title}</div>
+            ${w.year?`<div class="work-year">${w.year}</div>`:''}
+            <div class="work-desc">${w.desc}</div>
+            <div class="work-link-hint">
+              <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1.5 7.5l6-6M7.5 7.5V1.5H1.5"/></svg>
+              画像を検索
+            </div>
+          </div>
+        </a>`;
+        if(w.searchQuery){
+          fetchWorkImage(w.searchQuery, wid);
+        }
+      }
+      html += `</div>`;
+    }
+
+    if(info.keywords && info.keywords.length){
+      html += `<div class="tags">${info.keywords.map(k=>`<span class="tag">${k}</span>`).join("")}</div>`;
+    }
+
+    // links
+    const wikiSlug = info.wikipedia_en || p.wiki;
+    html += `<div class="links-row">`;
+    if(wikiSlug){
+      html += `<a class="link-btn" href="https://en.wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}" target="_blank">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="5"/><path d="M6 1C6 1 4 3 4 6s2 5 2 5M6 1C6 1 8 3 8 6s-2 5-2 5M1 6h10"/></svg>
+        Wikipedia (EN)
+      </a>`;
+    }
+    // Japanese Wikipedia
+    html += `<a class="link-btn" href="https://ja.wikipedia.org/wiki/${encodeURIComponent(p.name)}" target="_blank">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="6" cy="6" r="5"/><path d="M6 1C6 1 4 3 4 6s2 5 2 5M6 1C6 1 8 3 8 6s-2 5-2 5M1 6h10"/></svg>
+      Wikipedia (JP)
+    </a>`;
+    html += `<a class="link-btn" href="https://www.google.com/search?q=${encodeURIComponent(p.en+' artist designer')}" target="_blank">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="5" cy="5" r="4"/><line x1="8" y1="8" x2="11.5" y2="11.5" stroke-linecap="round"/></svg>
+      Google 検索
+    </a>`;
+    html += `<a class="link-btn" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.en)}" target="_blank">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="2" width="10" height="8" rx="1.5"/><circle cx="4.5" cy="5.5" r="1.5"/><path d="M7.5 5.5l2 2.5H1.5l2.5-2.5"/></svg>
+      画像検索
+    </a>`;
+    html += `</div>`;
+
+    document.getElementById("m-content").innerHTML = html;
+  }catch(e){
+    document.getElementById("m-content").innerHTML = `<p style="color:var(--t3);font-size:13px;">情報を取得できませんでした。</p>`;
+  }
+}
+
+// ── PIXEL ART GENERATION ──
+const pixelCache = {};
+
+function buildPixelSVG(hints, size=80){
+  const h = hints || {};
+  const skin = h.skinColor || '#F5C9A0';
+  const hair = h.hairColor || '#3D2B1F';
+  const cloth = h.clothColor || '#4A6FA5';
+  const eye = h.eyeColor || '#3D2B1F';
+  const feat = (h.feature||'').toLowerCase();
+  const S = size/16; // scale: 16x16 grid
+
+  const r = (x,y,w,h2,c) => `<rect x="${x*S}" y="${y*S}" width="${w*S}" height="${h2*S}" fill="${c}"/>`;
+
+  // 16x16 pixel grid portrait
+  let rects = '';
+  // background
+  rects += r(0,0,16,16,'#E8E4DC');
+  // body / shoulders
+  rects += r(3,10,10,6,cloth);
+  rects += r(4,9,8,3,cloth);
+  // neck
+  rects += r(6,8,4,2,skin);
+  // head
+  rects += r(4,3,8,6,skin);
+  // hair top
+  rects += r(4,2,8,2,hair);
+  rects += r(3,3,2,3,hair);
+  rects += r(11,3,2,3,hair);
+  // ears
+  rects += r(3,5,1,2,skin);
+  rects += r(12,5,1,2,skin);
+  // eyes
+  rects += r(5,5,2,1,eye);
+  rects += r(9,5,2,1,eye);
+  // eyebrows
+  rects += r(5,4,2,1,hair);
+  rects += r(9,4,2,1,hair);
+  // nose
+  rects += r(7,6,2,1,skin==='#F5C9A0'?'#E8A87C':darken(skin));
+  // mouth
+  rects += r(6,7,4,1,'#C07070');
+
+  // feature overlays
+  if(feat.includes('眼鏡') || feat.includes('glasses')){
+    rects += r(4,5,3,2,'none');
+    rects += `<rect x="${4*S}" y="${4*S}" width="${3*S}" height="${2*S}" fill="none" stroke="#333" stroke-width="${S*0.4}"/>`;
+    rects += `<rect x="${8*S}" y="${4*S}" width="${3*S}" height="${2*S}" fill="none" stroke="#333" stroke-width="${S*0.4}"/>`;
+    rects += r(7,5,1,1,'#888');
+  }
+  if(feat.includes('ひげ') || feat.includes('beard')){
+    rects += r(5,7,6,2,hair);
+    rects += r(6,7,4,1,'#C07070'); // keep mouth visible
+  }
+  if(feat.includes('帽子') || feat.includes('hat') || feat.includes('bald')){
+    rects += r(3,2,10,2,feat.includes('bald') ? skin : cloth);
+    rects += r(2,3,12,1,feat.includes('bald') ? skin : cloth);
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+function darken(hex){
+  const n = parseInt(hex.slice(1),16);
+  const r = Math.max(0,((n>>16)&255)-30);
+  const g = Math.max(0,((n>>8)&255)-30);
+  const b = Math.max(0,(n&255)-30);
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+async function generatePixelArt(idx){
+  const p = PEOPLE[idx];
+  if(pixelCache[idx]){
+    applyPixelToThumb(idx, pixelCache[idx]);
+    return;
+  }
+  // Quick generation with minimal API call
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:200,
+        system:"JSONのみ返答。前置き不要。",
+        messages:[{role:"user",content:`${p.en}の外見の特徴を推測して以下のJSONのみ返答:
+{"hairColor":"#hex","skinColor":"#hex","clothColor":"#hex","eyeColor":"#hex","feature":"眼鏡/ひげ/帽子/baldのどれか、または空文字"}`}]
+      })
+    });
+    const d = await res.json();
+    const raw = d.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    const hints = JSON.parse(raw);
+    pixelCache[idx] = hints;
+    applyPixelToThumb(idx, hints);
+  }catch(e){
+    applyPixelToThumb(idx, {});
+  }
+}
+
+function applyPixelToThumb(idx, hints){
+  const el = document.getElementById(`thumb-${idx}`);
+  if(!el) return;
+  const svg = buildPixelSVG(hints, 200);
+  el.innerHTML = svg;
+}
+
+async function generatePixelArtHero(idx){
+  const heroEl = document.getElementById(`hero-pixel-${idx}`);
+  if(!heroEl) return;
+  let hints = pixelCache[idx];
+  if(!hints){
+    // wait briefly for cache, else use empty
+    await new Promise(r=>setTimeout(r,500));
+    hints = pixelCache[idx] || {};
+  }
+  const svg = buildPixelSVG(hints, 400);
+  heroEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#E8E4DC;border-radius:16px 16px 0 0;">${svg}</div>`;
+}
+
+// fetch work artwork image via Wikipedia search
+async function fetchWorkImage(query, elId){
+  try{
+    const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=1`;
+    const sr = await fetch(searchUrl);
+    const sd = await sr.json();
+    const results = sd.query && sd.query.search;
+    if(!results || !results.length) return;
+    const title = results[0].title.replace(/ /g,"_");
+    const imgData = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+    const d = await imgData.json();
+    if(d.thumbnail){
+      const url = d.thumbnail.source.replace(/\/\d+px-/,'/300px-');
+      const el = document.getElementById(elId);
+      if(el) el.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<div class=\\'wi\\'>${"?"}</div>'">`;
+    }
+  }catch(e){}
+}
+
+function closeModal(){
+  document.getElementById("modal-overlay").classList.remove("open");
+}
+document.getElementById("modal-overlay").addEventListener("click",function(e){ if(e.target===this) closeModal(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+// ── INIT ──
+renderFilters();
+filterCards();
+switchView("grid");
+</script>
+</body>
+</html>
